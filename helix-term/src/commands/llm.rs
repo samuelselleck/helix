@@ -9,6 +9,23 @@ use crate::{
 
 use super::{exit_select_mode, Context};
 
+use anyhow::Result;
+use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
+use serde_json::{json, Value};
+use std::env;
+
+// TODO
+// - add a "write relative to current buffer" command
+// - make llm completions contain buffer context/other ways to provide
+// - improve prompt
+// - make "space-l" provide a list of common actions?
+//    - improve quality (personal quality document)
+//    - fix bugs
+//    - etc.
+// - make llm requests async (and in parallel per selection)?
+// - other workflows?
+// - agentic capabilities?
+
 pub fn llm_replace(cx: &mut Context) {
     fn create_llm_prompt(history_register: Option<char>) -> Box<ui::Prompt> {
         let prompt = ui::Prompt::new(
@@ -68,11 +85,6 @@ pub fn llm_replace(cx: &mut Context) {
     exit_select_mode(cx);
 }
 
-use anyhow::Result;
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
-use serde_json::{json, Value};
-use std::env;
-
 pub async fn get_completion(prompt: &str, code: &str) -> Result<String> {
     let client = reqwest::Client::new();
     let api_key = env::var("ANTHROPIC_API_KEY")?;
@@ -81,6 +93,7 @@ pub async fn get_completion(prompt: &str, code: &str) -> Result<String> {
 
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    // Set headers for JSON content and API key authentication
     headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
     headers.insert("X-API-Key", HeaderValue::from_str(&api_key)?);
     headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
@@ -135,5 +148,9 @@ pub async fn get_completion(prompt: &str, code: &str) -> Result<String> {
 
     // Extract code between backticks, preserving indentation and newlines
     let completion = raw_completion.trim_matches(['`'; 3]);
-    Ok(completion.trim_start_matches('\n').to_string())
+    let mut res = completion.trim_start_matches('\n').to_string();
+    if code.ends_with('\n') && !res.ends_with('\n') {
+        res.push('\n')
+    }
+    Ok(res)
 }
