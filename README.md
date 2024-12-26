@@ -1,3 +1,6 @@
+# Personal Helix Fork
+With LLM completion using `space-l` and other utilities.
+
 <div align="center">
 
 <h1>
