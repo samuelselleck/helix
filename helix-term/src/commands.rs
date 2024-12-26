@@ -1,4 +1,5 @@
 pub(crate) mod dap;
+pub(crate) mod llm;
 pub(crate) mod lsp;
 pub(crate) mod typed;
 
@@ -10,6 +11,7 @@ use helix_stdx::{
     rope::{self, RopeSliceExt},
 };
 use helix_vcs::{FileChange, Hunk};
+pub use llm::*;
 pub use lsp::*;
 use tui::text::Span;
 pub use typed::*;
@@ -587,6 +589,7 @@ impl MappableCommand {
         extend_to_word, "Extend to a two-character label",
         goto_next_tabstop, "goto next snippet placeholder",
         goto_prev_tabstop, "goto next snippet placeholder",
+        llm_replace, "prompt llm to modify the currently selected blocks",
     );
 }
 

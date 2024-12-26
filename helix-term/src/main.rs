@@ -1,5 +1,6 @@
 use anyhow::{Context, Error, Result};
 use crossterm::event::EventStream;
+use dotenv::dotenv;
 use helix_loader::VERSION_AND_GIT_HASH;
 use helix_term::application::Application;
 use helix_term::args::Args;
@@ -42,6 +43,7 @@ fn main() -> Result<()> {
 async fn main_impl() -> Result<i32> {
     let mut args = Args::parse_args().context("could not parse arguments")?;
 
+    dotenv()?;
     helix_loader::initialize_config_file(args.config_file.clone());
     helix_loader::initialize_log_file(args.log_file.clone());
 
