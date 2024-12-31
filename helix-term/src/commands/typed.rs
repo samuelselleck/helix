@@ -391,6 +391,53 @@ fn write(
     write_impl(cx, args.first(), false)
 }
 
+fn write_relative_to_current_buffer(
+    cx: &mut compositor::Context,
+    args: &[Cow<str>],
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    write_relative_to_current_buffer_impl(cx, args, event, false)
+}
+
+fn force_write_relative_to_current_buffer(
+    cx: &mut compositor::Context,
+    args: &[Cow<str>],
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    write_relative_to_current_buffer_impl(cx, args, event, true)
+}
+
+fn write_relative_to_current_buffer_impl(
+    cx: &mut compositor::Context,
+    args: &[Cow<str>],
+    event: PromptEvent,
+    force: bool,
+) -> anyhow::Result<()> {
+    if event != PromptEvent::Validate {
+        return Ok(());
+    }
+    let curr_path: Option<PathBuf> = {
+        let (_, doc) = current!(cx.editor);
+        doc.path().and_then(|d| d.parent()).map(|v| v.to_path_buf())
+    };
+    let Some(path_ext) = args.first() else {
+        cx.editor
+            .set_status("didn't write: provide a relative path");
+        return Ok(());
+    };
+    let Some(mut curr_path) = curr_path else {
+        cx.editor
+            .set_status("didn't write: current buffer has no parent directory");
+        return Ok(());
+    };
+    curr_path.push(Path::new(path_ext.as_ref()));
+    write_impl(
+        cx,
+        curr_path.to_str().map(|v| Cow::Borrowed(v)).as_ref(),
+        force,
+    )
+}
+
 fn force_write(
     cx: &mut compositor::Context,
     args: &[Cow<str>],
@@ -2530,6 +2577,20 @@ fn read(cx: &mut compositor::Context, args: &[Cow<str>], event: PromptEvent) -> 
 }
 
 pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
+    TypableCommand {
+        name: "write-relative-to-current-buffer",
+        aliases: &["wr"],
+        doc: "Write to file relative to parent of current buffer.",
+        fun: write_relative_to_current_buffer,
+        signature: CommandSignature::none(),
+    },
+    TypableCommand {
+        name: "write-relative-to-current-buffer!",
+        aliases: &["wr!"],
+        doc: "Force write to file relative to parent of current buffer.",
+        fun: force_write_relative_to_current_buffer,
+        signature: CommandSignature::none(),
+    },
     TypableCommand {
         name: "quit",
         aliases: &["q"],
