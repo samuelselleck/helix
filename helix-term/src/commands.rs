@@ -3496,6 +3496,7 @@ fn open(cx: &mut Context, open: Open) {
             doc.language_config()
                 .and_then(|config| config.comment_tokens.as_ref())
                 .and_then(|tokens| comment::get_comment_token(text, tokens, curr_line_num))
+                .map(|(_ind, token)| token)
         } else {
             None
         };
@@ -4005,6 +4006,7 @@ pub mod insert {
                 doc.language_config()
                     .and_then(|config| config.comment_tokens.as_ref())
                     .and_then(|tokens| comment::get_comment_token(text, tokens, current_line))
+                    .map(|(_ind, token)| token)
             } else {
                 None
             };
@@ -4638,11 +4640,19 @@ fn indent(cx: &mut Context) {
     let transaction = Transaction::change(
         doc.text(),
         lines.into_iter().filter_map(|line| {
-            let is_blank = doc.text().line(line).chunks().all(|s| s.trim().is_empty());
+            let text = doc.text();
+            let is_blank = text.line(line).chunks().all(|s| s.trim().is_empty());
             if is_blank {
                 return None;
             }
-            let pos = doc.text().line_to_char(line);
+            let line_comment_token = doc
+                .language_config()
+                .and_then(|config| config.comment_tokens.as_ref())
+                .and_then(|tokens| comment::get_comment_token(text.slice(..), tokens, line));
+            let pos = text.line_to_char(line)
+                + line_comment_token
+                    .map(|(ind, c)| ind + c.chars().count())
+                    .unwrap_or(0);
             Some((pos, pos, Some(indent.clone())))
         }),
     );
@@ -4661,9 +4671,18 @@ fn unindent(cx: &mut Context) {
     for line_idx in lines {
         let line = doc.text().line(line_idx);
         let mut width = 0;
-        let mut pos = 0;
 
-        for ch in line.chars() {
+        let line_comment_token = doc
+            .language_config()
+            .and_then(|config| config.comment_tokens.as_ref())
+            .and_then(|tokens| comment::get_comment_token(doc.text().slice(..), tokens, line_idx));
+        let line_start = line_comment_token
+            .map(|(ind, token)| ind + token.chars().count())
+            .unwrap_or(0);
+
+        let mut pos = line_start;
+
+        for ch in line.chars().skip(line_start) {
             match ch {
                 ' ' => width += 1,
                 '\t' => width = (width / tab_width + 1) * tab_width,
@@ -4678,9 +4697,9 @@ fn unindent(cx: &mut Context) {
         }
 
         // now delete from start to first non-blank
-        if pos > 0 {
+        if pos > line_start {
             let start = doc.text().line_to_char(line_idx);
-            changes.push((start, start + pos, None))
+            changes.push((start + line_start, start + pos, None))
         }
     }
 

@@ -16,15 +16,19 @@ pub fn get_comment_token<'a, S: AsRef<str>>(
     text: RopeSlice,
     tokens: &'a [S],
     line_num: usize,
-) -> Option<&'a str> {
+) -> Option<(usize, &'a str)> {
     let line = text.line(line_num);
     let start = line.first_non_whitespace_char()?;
 
     tokens
         .iter()
         .map(AsRef::as_ref)
-        .filter(|token| line.slice(start..).starts_with(token))
-        .max_by_key(|token| token.len())
+        .filter_map(|token| {
+            line.slice(start..)
+                .starts_with(token)
+                .then_some((start, token))
+        })
+        .max_by_key(|(_, token)| token.len())
 }
 
 /// Given text, a comment token, and a set of line indices, returns the following:
@@ -484,7 +488,7 @@ mod test {
 
         assert_eq!(
             super::get_comment_token(text.slice(..), tokens.as_slice(), 0),
-            Some("///")
+            Some((4, "///"))
         );
     }
 }
